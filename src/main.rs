@@ -71,8 +71,6 @@ fn main() {
    let mut support_card_pool: Vec<SupportCard> = serde_json::from_slice(&std::fs::read("cards.json").unwrap()).unwrap();
    support_card_pool.retain(|x| x.rarity > 1 && x.limit_break == 4 && x.r#type <= 4);
 
-   println!("{}", support_card_pool.len());
-
    let (sender, receiver) = mpsc::sync_channel::<Result>(16);
 
    for _ in 0..8 {
