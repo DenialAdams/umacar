@@ -21,7 +21,7 @@ pub struct SupportCard {
     pub limit_break: u32,
     pub starting_stats: [u32; 5],
     pub type_stats: u32,
-    pub stat_bonus: [u32; 6],
+    pub stat_bonus: [u8; 6],
     pub race_bonus: u32,
     pub sb: u32,
     pub specialty_rate: u32,
@@ -276,8 +276,14 @@ fn take_action<R: Rng>(s: &mut State, action: Action, deck: &[SupportCard], rng:
                 {
                     //println!("{}", sum_mood_bonus);
                     let base_training_value = training_val + training_level as f64; // TODO - wrong - how to find it?
-                    // TODO add support card stat bonus
-                    let final_training_value = base_training_value
+                    let bonus_training_value = s
+                        .support_locations
+                        .iter()
+                        .enumerate()
+                        .filter(|(_, where_at)| **where_at == training_stat)
+                        .map(|(i, _)| &deck[i].stat_bonus[stat as usize])
+                        .sum::<u8>() as f64;
+                    let final_training_value = (base_training_value + bonus_training_value)
                         * friendship_multiplier
                         * mood_multiplier
                         * effectiveness_mulitiplier
