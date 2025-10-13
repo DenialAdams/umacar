@@ -449,6 +449,14 @@ fn random_rollout<R: Rng>(mut s: State, deck: &[SupportCard], rng: &mut R) -> f6
     rating(&s.stats)
 }
 
+#[derive(Clone, Copy)] // I don't really want copy except to initialize an array
+struct MctsStats {
+    num_sims: usize,
+    total_score: f64,
+}
+
+const MCTS_SIMS: usize = 1000;
+
 fn intelligently_run_career<R: Rng>(
     state: &mut State,
     deck: &[SupportCard],
@@ -465,21 +473,36 @@ fn intelligently_run_career<R: Rng>(
             Action::Train(Stat::Wit),
             Action::Recreation,
         ];
-        // Pure MCTS. TODO: Go with UCB
-        let best_action_to_take = possible_actions
-            .iter()
-            .max_by_key(|a| {
-                let mut sum: f64 = 0.0;
-                for _ in 0..1000 {
-                    let mut s = state.clone();
-                    take_action(&mut s, **a, deck, rng);
-                    sum += random_rollout(s, deck, rng);
+        let mut mcts_stats: [MctsStats; 7] = [MctsStats { num_sims: 0, total_score: 0.0 }; 7];
+        let mut total_sims = 0;
+        while total_sims < MCTS_SIMS {
+            let action_to_try = mcts_stats.iter().enumerate().max_by_key(|(_, n)| {
+                if n.num_sims == 0 {
+                    return n64(f64::infinity());
                 }
-                n64(sum)
+                let avg_rating = n.total_score / n.num_sims as f64;
+                let r_prime = avg_rating / 19205.0; // 19205.0 is the max rating by stats only. need to update if we factor in skills.
+                n64(r_prime + 2.0.sqrt() * ((total_sims as f64).ln() / n.num_sims as f64).sqrt())
+            }).map(|(i, _)| i).unwrap();
+
+            let mut s = state.clone();
+            take_action(&mut s, possible_actions[action_to_try], deck, rng);
+
+            mcts_stats[action_to_try].num_sims += 1;
+            mcts_stats[action_to_try].total_score += random_rollout(s, deck, rng);
+
+            total_sims += 1;
+        }
+        let best_action_to_take = mcts_stats
+            .iter()
+            .enumerate()
+            .max_by_key(|(_, n)| {
+                n.num_sims
             })
+            .map(|(i, _)| possible_actions[i])
             .unwrap();
-        actions.push(*best_action_to_take);
-        take_action(state, *best_action_to_take, deck, rng);
+        actions.push(best_action_to_take);
+        take_action(state, best_action_to_take, deck, rng);
     }
     actions
 }
@@ -490,6 +513,7 @@ fn main() {
     support_card_pool.retain(|x| x.rarity > 1 && x.limit_break == 4 && x.r#type <= 4);
 
     let mut rng = XorShiftRng::from_os_rng();
+    //let mut rng = XorShiftRng::from_seed([123; 16]);
 
     let mut best_deck: Vec<SupportCard> = Vec::new();
     let mut best_rating: f64 = 0.0;
