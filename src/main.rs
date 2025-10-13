@@ -521,8 +521,8 @@ fn main() {
     let mut best_stats: [u16; 5] = [0; 5];
 
     // Try some decks
-    for _ in 0..10 {
-        let deck: &[SupportCard] = 'create_deck: loop {
+    for _ in 0..1000 {
+        'create_deck: loop {
             support_card_pool.shuffle(&mut rng);
             let mut chars_in_deck: HashSet<&str> = HashSet::new();
             for card in support_card_pool[0..6].iter() {
@@ -530,8 +530,9 @@ fn main() {
                     continue 'create_deck;
                 }
             }
-            break &support_card_pool[0..6];
+            break;
         };
+        let deck = &support_card_pool[0..6];
         let mut state = State {
             energy: 100,
             mood: Mood::Normal,
