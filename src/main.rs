@@ -226,38 +226,72 @@ fn take_action<R: Rng>(s: &mut State, action: Action, deck: &[SupportCard], rng:
                 }
             }
         }
-        Action::Train(stat) => {
-            let training_level = (s.times_trained[stat as usize] / 4).min(4);
+        Action::Train(training_stat) => {
             let failure_chance = if s.energy < 50 { 0.8 } else { 0.0 }; // TODO
             if rng.random_bool(1.0 - failure_chance) {
-                let num_ppl_here = s.support_locations.iter().filter(|where_at| **where_at == stat).count();
+                let stat_values_for_training: [f64; 5] = match training_stat {
+                    Stat::Speed => [10.0, 0.0, 5.0, 0.0, 0.0],
+                    Stat::Stamina => [0.0, 10.0, 0.0, 5.0, 0.0],
+                    Stat::Power => [0.0, 5.0, 10.0, 0.0, 0.0],
+                    Stat::Guts => [5.0, 0.0, 5.0, 10.0, 0.0],
+                    Stat::Wit => [5.0, 0.0, 0.0, 0.0, 10.0],
+                }; // TODO - these are totally bogus
+                let training_level = (s.times_trained[training_stat as usize] / 4).min(4);
+                let num_ppl_here = s
+                    .support_locations
+                    .iter()
+                    .filter(|where_at| **where_at == training_stat)
+                    .count();
                 let sum_training_effectiveness: f64 = s
-                            .support_locations
-                            .iter()
-                            .enumerate()
-                            .filter(|(_, where_at)| **where_at == stat)
-                            .map(|(i, _)| &deck[i].tb)
-                            .sum::<f64>() - num_ppl_here as f64;
+                    .support_locations
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, where_at)| **where_at == training_stat)
+                    .map(|(i, _)| &deck[i].tb)
+                    .sum::<f64>()
+                    - num_ppl_here as f64;
                 let sum_mood_bonus: f64 = s
-                            .support_locations
-                            .iter()
-                            .enumerate()
-                            .filter(|(_, where_at)| **where_at == stat)
-                            .map(|(i, _)| &deck[i].mb)
-                            .sum::<f64>() - num_ppl_here as f64;
-                //println!("{}", sum_mood_bonus);
-                let base_training_value = 10.0 + training_level as f64; // TODO - wrong - how to find it?
-                // TODO add support card stat bonus
+                    .support_locations
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, where_at)| **where_at == training_stat)
+                    .map(|(i, _)| &deck[i].mb)
+                    .sum::<f64>()
+                    - num_ppl_here as f64;
                 let friendship_multiplier = 1.0; // TODO
                 let mood_multiplier = 1.0 + (s.mood.as_modifier() * (1.0 + sum_mood_bonus));
                 let effectiveness_mulitiplier = 1.0 + sum_training_effectiveness;
                 let ppl_here_multiplier = 1.0 + (num_ppl_here as f64 * 0.05);
                 let growth_rate = 1.0; // TODO
-                let final_training_value = base_training_value * friendship_multiplier * mood_multiplier * effectiveness_mulitiplier * ppl_here_multiplier * growth_rate;
-                s.stats[stat as usize] =
-                    add_with_cap(s.stats[stat as usize], final_training_value.round() as u16, 1200);
-                s.times_trained[stat as usize] = s.times_trained[stat as usize].saturating_add(1);
-                match stat {
+                for (training_val, stat) in stat_values_for_training
+                    .iter()
+                    .zip([
+                        Stat::Speed,
+                        Stat::Stamina,
+                        Stat::Power,
+                        Stat::Guts,
+                        Stat::Wit,
+                    ])
+                    .filter(|(tv, _)| **tv != 0.0)
+                {
+                    //println!("{}", sum_mood_bonus);
+                    let base_training_value = training_val + training_level as f64; // TODO - wrong - how to find it?
+                    // TODO add support card stat bonus
+                    let final_training_value = base_training_value
+                        * friendship_multiplier
+                        * mood_multiplier
+                        * effectiveness_mulitiplier
+                        * ppl_here_multiplier
+                        * growth_rate;
+                    s.stats[stat as usize] = add_with_cap(
+                        s.stats[stat as usize],
+                        final_training_value.round() as u16,
+                        1200,
+                    );
+                }
+                s.times_trained[training_stat as usize] =
+                    s.times_trained[training_stat as usize].saturating_add(1);
+                match training_stat {
                     Stat::Speed => {
                         s.energy = s.energy.saturating_sub(20);
                     }
@@ -284,7 +318,8 @@ fn take_action<R: Rng>(s: &mut State, action: Action, deck: &[SupportCard], rng:
             } else {
                 // TODO
                 s.mood = s.mood.prior();
-                s.stats[stat as usize] = s.stats[stat as usize].saturating_sub(10);
+                s.stats[training_stat as usize] =
+                    s.stats[training_stat as usize].saturating_sub(10);
             }
         }
         Action::Recreation => {
@@ -369,7 +404,11 @@ fn random_rollout<R: Rng>(mut s: State, deck: &[SupportCard], rng: &mut R) -> f6
     rating(&s.stats)
 }
 
-fn intelligently_run_career<R: Rng>(state: &mut State, deck: &[SupportCard], rng: &mut R) -> Vec<Action> {
+fn intelligently_run_career<R: Rng>(
+    state: &mut State,
+    deck: &[SupportCard],
+    rng: &mut R,
+) -> Vec<Action> {
     let mut actions = Vec::new();
     while state.turn < CAREER_LENGTH {
         let possible_actions = [
