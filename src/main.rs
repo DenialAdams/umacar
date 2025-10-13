@@ -457,6 +457,7 @@ fn intelligently_run_career<R: Rng>(
             Action::Train(Stat::Wit),
             Action::Recreation,
         ];
+        // Pure MCTS. TODO: Go with UCB
         let best_action_to_take = possible_actions
             .iter()
             .max_by_key(|a| {
