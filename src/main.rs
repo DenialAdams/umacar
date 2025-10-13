@@ -316,18 +316,26 @@ fn take_action<R: Rng>(s: &mut State, action: Action, deck: &[SupportCard], rng:
                 }
 
                 // Adjust energy
+                let energy_adjustment_for_training_level = match training_level {
+                    0 => 0,
+                    1 => 1,
+                    2 => 2,
+                    3 => 4,
+                    4 => 6,
+                    _ => unreachable!(),
+                };
                 match training_stat {
                     Stat::Speed => {
-                        s.energy = s.energy.saturating_sub(20);
+                        s.energy = s.energy.saturating_sub(21 + energy_adjustment_for_training_level);
                     }
                     Stat::Stamina => {
-                        s.energy = s.energy.saturating_sub(20);
+                        s.energy = s.energy.saturating_sub(19 + energy_adjustment_for_training_level);
                     }
                     Stat::Power => {
-                        s.energy = s.energy.saturating_sub(20);
+                        s.energy = s.energy.saturating_sub(20 + energy_adjustment_for_training_level);
                     }
                     Stat::Guts => {
-                        s.energy = s.energy.saturating_sub(20);
+                        s.energy = s.energy.saturating_sub(22 + energy_adjustment_for_training_level);
                     }
                     Stat::Wit => {
                         let sum_wis_recovery: u8 = s
