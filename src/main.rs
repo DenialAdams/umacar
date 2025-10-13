@@ -247,18 +247,25 @@ fn take_action<R: Rng>(s: &mut State, action: Action, deck: &[SupportCard], rng:
                     .iter()
                     .enumerate()
                     .filter(|(_, where_at)| **where_at == training_stat)
-                    .map(|(i, _)| &deck[i].tb)
-                    .sum::<f64>()
-                    - num_ppl_here as f64;
+                    .map(|(i, _)| deck[i].tb - 1.0)
+                    .sum::<f64>();
+                let sum_friendship_bonus: f64 = s
+                    .support_locations
+                    .iter()
+                    .enumerate()
+                    .filter(|(i, where_at)| {
+                        **where_at == training_stat && deck[*i].r#type == training_stat as u8 && s.friendship[*i] >= 80
+                    })
+                    .map(|(i, _)| deck[i].fs_bonus - 1.0)
+                    .sum::<f64>();
                 let sum_mood_bonus: f64 = s
                     .support_locations
                     .iter()
                     .enumerate()
                     .filter(|(_, where_at)| **where_at == training_stat)
-                    .map(|(i, _)| &deck[i].mb)
-                    .sum::<f64>()
-                    - num_ppl_here as f64;
-                let friendship_multiplier = 1.0; // TODO
+                    .map(|(i, _)| deck[i].mb - 1.0)
+                    .sum::<f64>();
+                let friendship_multiplier = 1.0 + sum_friendship_bonus;
                 let mood_multiplier = 1.0 + (s.mood.as_modifier() * (1.0 + sum_mood_bonus));
                 let effectiveness_mulitiplier = 1.0 + sum_training_effectiveness;
                 let ppl_here_multiplier = 1.0 + (num_ppl_here as f64 * 0.05);
@@ -274,7 +281,6 @@ fn take_action<R: Rng>(s: &mut State, action: Action, deck: &[SupportCard], rng:
                     ])
                     .filter(|(tv, _)| **tv != 0.0)
                 {
-                    //println!("{}", sum_mood_bonus);
                     let base_training_value = training_val + training_level as f64; // TODO - wrong - how to find it?
                     let bonus_training_value = s
                         .support_locations
@@ -297,6 +303,19 @@ fn take_action<R: Rng>(s: &mut State, action: Action, deck: &[SupportCard], rng:
                 }
                 s.times_trained[training_stat as usize] =
                     s.times_trained[training_stat as usize].saturating_add(1);
+
+                // Adjust friendship
+                for card_here in s
+                    .support_locations
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, where_at)| **where_at == training_stat)
+                    .map(|(i, _)| i)
+                {
+                    s.friendship[card_here] = add_with_cap(s.friendship[card_here], 7, 100);
+                }
+
+                // Adjust energy
                 match training_stat {
                     Stat::Speed => {
                         s.energy = s.energy.saturating_sub(20);
@@ -411,7 +430,10 @@ fn random_rollout<R: Rng>(mut s: State, deck: &[SupportCard], rng: &mut R) -> f6
         if s.turn == CAREER_LENGTH {
             break;
         }
-        if RANDOM_ROLLOUT_MAX_TURNS.map(|max_turns| s.turn - start_turn >= max_turns).unwrap_or(false) {
+        if RANDOM_ROLLOUT_MAX_TURNS
+            .map(|max_turns| s.turn - start_turn >= max_turns)
+            .unwrap_or(false)
+        {
             break;
         }
         take_action(&mut s, *possible_actions.choose(rng).unwrap(), deck, rng);
@@ -469,6 +491,7 @@ fn main() {
     for _ in 0..10 {
         support_card_pool.shuffle(&mut rng);
         let deck: &[SupportCard] = &support_card_pool[0..6];
+        // TODO: rejection sample until deck is valid - no duplicate characters
         let mut state = State {
             energy: 100,
             mood: Mood::Normal,
