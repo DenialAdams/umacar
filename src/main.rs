@@ -19,7 +19,7 @@ pub struct SupportCard {
     pub group: bool,
     pub rarity: u32,
     pub limit_break: u32,
-    pub starting_stats: [u32; 5],
+    pub starting_stats: [u16; 5],
     pub type_stats: u32,
     pub stat_bonus: [u8; 6],
     pub race_bonus: u32,
@@ -394,6 +394,8 @@ fn rate_stat(mut t: u16) -> f64 {
     }
 }
 
+const RANDOM_ROLLOUT_MAX_TURNS: Option<u8> = None;
+
 fn random_rollout<R: Rng>(mut s: State, deck: &[SupportCard], rng: &mut R) -> f64 {
     let possible_actions = [
         Action::Rest,
@@ -404,7 +406,14 @@ fn random_rollout<R: Rng>(mut s: State, deck: &[SupportCard], rng: &mut R) -> f6
         Action::Train(Stat::Wit),
         Action::Recreation,
     ];
-    while s.turn < CAREER_LENGTH {
+    let start_turn = s.turn;
+    loop {
+        if s.turn == CAREER_LENGTH {
+            break;
+        }
+        if RANDOM_ROLLOUT_MAX_TURNS.map(|max_turns| s.turn - start_turn >= max_turns).unwrap_or(false) {
+            break;
+        }
         take_action(&mut s, *possible_actions.choose(rng).unwrap(), deck, rng);
     }
     rating(&s.stats)
@@ -475,6 +484,11 @@ fn main() {
                 Stat::Speed,
             ],
         };
+        for card in deck {
+            for (i, initial_boost) in card.starting_stats.iter().enumerate() {
+                state.stats[i] = add_with_cap(state.stats[i], *initial_boost, 1200);
+            }
+        }
         deal_supports(&mut state, deck, &mut rng);
         let actions = intelligently_run_career(&mut state, deck, &mut rng);
         let rtg = rating(&state.stats);
