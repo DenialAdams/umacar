@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+atomic_float = "1"
 rand = "0.9"
 noisy_float = "0.2"
 num-traits = "0.2"
