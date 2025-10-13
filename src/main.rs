@@ -1,6 +1,6 @@
 #![feature(variant_count)]
 
-use std::fmt::Display;
+use std::{collections::HashSet, fmt::Display};
 
 use noisy_float::prelude::*;
 use num_traits::PrimInt;
@@ -498,9 +498,16 @@ fn main() {
 
     // Try some decks
     for _ in 0..10 {
-        support_card_pool.shuffle(&mut rng);
-        let deck: &[SupportCard] = &support_card_pool[0..6];
-        // TODO: rejection sample until deck is valid - no duplicate characters
+        let deck: &[SupportCard] = 'create_deck: loop {
+            support_card_pool.shuffle(&mut rng);
+            let mut chars_in_deck: HashSet<&str> = HashSet::new();
+            for card in support_card_pool[0..6].iter() {
+                if !chars_in_deck.insert(&card.char_name) {
+                    continue 'create_deck;
+                }
+            }
+            break &support_card_pool[0..6];
+        };
         let mut state = State {
             energy: 100,
             mood: Mood::Normal,
