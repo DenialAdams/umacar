@@ -511,9 +511,9 @@ fn main() {
         let mut state = State {
             energy: 100,
             mood: Mood::Normal,
-            stats: [0, 0, 0, 0, 0],
+            stats: [100; 5],
             turn: 0,
-            times_trained: [0, 0, 0, 0, 0],
+            times_trained: [0; 5],
             friendship: [0; 6],
             support_locations: [
                 Stat::Speed,
