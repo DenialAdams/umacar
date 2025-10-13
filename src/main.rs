@@ -70,6 +70,7 @@ static BEST_RATING: AtomicF64 = AtomicF64::new(0.0);
 fn main() {
    let mut support_card_pool: Vec<SupportCard> = serde_json::from_slice(&std::fs::read("cards.json").unwrap()).unwrap();
    support_card_pool.retain(|x| x.rarity > 1 && x.limit_break == 4 && x.r#type <= 4);
+   //support_card_pool.retain(|x| x.r#type == 0 || x.r#type == 4);
 
    let (sender, receiver) = mpsc::sync_channel::<Result>(16);
 
@@ -133,6 +134,7 @@ fn main() {
                println!("{:?}", best_result.stats);
                println!("{}", best_result.rating);
             }
+            dirty = false;
          }
          Err(RecvTimeoutError::Disconnected) => {
             if dirty {

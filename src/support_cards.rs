@@ -15,7 +15,7 @@ pub struct SupportCard {
    pub type_stats: u32,
    pub stat_bonus: [u8; 6],
    pub race_bonus: u32,
-   pub sb: u32,
+   pub sb: u8,
    pub specialty_rate: u32,
    pub unique_specialty: f64,
    pub offstat_appearance_denominator: u32,

@@ -259,10 +259,12 @@ pub fn new_career_state(deck: &[SupportCard]) -> State {
       friendship: [0; 6],
       support_locations: [Stat::Speed, Stat::Speed, Stat::Speed, Stat::Speed, Stat::Speed],
    };
-   for card in deck {
-      for (i, initial_boost) in card.starting_stats.iter().enumerate() {
-         state.stats[i] = add_with_cap(state.stats[i], *initial_boost, 1200);
+   for (i, card) in deck.iter().enumerate() {
+      for (j, initial_boost) in card.starting_stats.iter().enumerate() {
+         state.stats[j] = add_with_cap(state.stats[j], *initial_boost, 1200);
       }
+
+      state.friendship[i] = add_with_cap(state.friendship[i], card.sb, 100);
    }
    state
 }

@@ -6,7 +6,7 @@ use crate::career::{Action, Stat, State, take_action};
 use crate::ratings::rating;
 
 const CAREER_LENGTH: u8 = 72;
-const MCTS_SIMS: usize = 1000;
+const MCTS_SIMS: usize = 2000;
 const RANDOM_ROLLOUT_MAX_TURNS: Option<u8> = None;
 
 #[derive(Clone, Copy)] // I don't really want copy except to initialize an array
