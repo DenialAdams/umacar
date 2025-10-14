@@ -88,19 +88,16 @@ const PRIO: [[Stat; 5]; 5] = [
 pub fn deal_supports<R: Rng>(s: &mut State, deck: &[SupportCard], rng: &mut R) {
    for (card, location) in deck.iter().zip(s.support_locations.iter_mut()) {
       let stat_prio = PRIO[card.r#type as usize];
-      // TODO: kitasan unique effect
-      let denom = 550 + card.specialty_rate;
-      let val = rng.random_range(0..denom);
-      if val < card.specialty_rate + 110 {
+      let specialty_rate = (100.0 + card.specialty_rate as f64) * card.unique_specialty;
+      let denom = 450.0 + specialty_rate;
+      let val = rng.random_range(0.0..denom);
+      if val < specialty_rate {
          *location = stat_prio[0];
-      } else if val < card.specialty_rate + 220 {
-         *location = stat_prio[1];
-      } else if val < card.specialty_rate + 330 {
-         *location = stat_prio[2];
-      } else if val < card.specialty_rate + 440 {
-         *location = stat_prio[3];
       } else {
-         *location = stat_prio[4];
+         let tail = denom - specialty_rate;
+         let step = tail / 4.0;
+         let idx = ((val - specialty_rate) / step).floor() as usize;
+         *location = stat_prio[1 + idx];
       }
    }
 }
@@ -264,7 +261,7 @@ pub fn new_career_state(deck: &[SupportCard]) -> State {
          state.stats[j] = add_with_cap(state.stats[j], *initial_boost, 1200);
       }
 
-      state.friendship[i] = add_with_cap(state.friendship[i], card.sb, 100);
+      state.friendship[i] = card.sb;
    }
    state
 }

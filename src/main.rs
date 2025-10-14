@@ -5,12 +5,14 @@ mod mcts;
 mod ratings;
 mod support_cards;
 
-use std::collections::HashSet;
-use std::sync::atomic::Ordering;
-use std::sync::mpsc::{self, RecvTimeoutError, SyncSender};
-use std::time::Duration;
+use std::collections::{HashMap, HashSet};
+use std::fs::File;
+use std::io::Write;
+use std::sync::mpsc::{self};
+use std::time::{Duration, Instant};
 
-use atomic_float::AtomicF64;
+use indexmap::IndexMap;
+use noisy_float::prelude::*;
 use rand::prelude::*;
 use rand_xorshift::XorShiftRng;
 
@@ -18,44 +20,6 @@ use crate::career::{Action, deal_supports, new_career_state};
 use crate::mcts::intelligently_run_career;
 use crate::ratings::rating;
 use crate::support_cards::SupportCard;
-
-fn try_report_score(
-   rating: f64,
-   actions: &[Action],
-   deck: &[SupportCard],
-   stats: &[u16],
-   known_rating: f64,
-   atomic: &AtomicF64,
-   sender: &SyncSender<Result>,
-) -> f64 {
-   let mut prev_val = known_rating;
-   let mut updated = false;
-   loop {
-      match atomic.compare_exchange_weak(prev_val, rating, Ordering::Relaxed, Ordering::Relaxed) {
-         Ok(_) => {
-            updated = true;
-            break;
-         }
-         Err(v) => {
-            if v >= rating {
-               break;
-            }
-            prev_val = v;
-         }
-      }
-   }
-   if updated {
-      sender
-         .send(Result {
-            rating,
-            actions: actions.to_vec(),
-            deck: deck.to_vec(),
-            stats: stats.try_into().unwrap(),
-         })
-         .unwrap();
-   }
-   prev_val
-}
 
 #[derive(Default)]
 struct Result {
@@ -65,8 +29,6 @@ struct Result {
    stats: [u16; 5],
 }
 
-static BEST_RATING: AtomicF64 = AtomicF64::new(0.0);
-
 fn main() {
    let mut support_card_pool: Vec<SupportCard> = serde_json::from_slice(&std::fs::read("cards.json").unwrap()).unwrap();
    support_card_pool.retain(|x| x.rarity > 1 && x.limit_break == 4 && x.r#type <= 4);
@@ -74,12 +36,11 @@ fn main() {
 
    let (sender, receiver) = mpsc::sync_channel::<Result>(16);
 
-   for _ in 0..8 {
+   for _ in 0..15 {
       let sender = sender.clone();
       let mut support_card_pool = support_card_pool.clone();
       std::thread::spawn(move || {
          let mut rng = XorShiftRng::from_os_rng();
-         let mut known_best_rating = 0.0;
          loop {
             'create_deck: loop {
                support_card_pool.shuffle(&mut rng);
@@ -97,58 +58,53 @@ fn main() {
             let actions = intelligently_run_career(&mut state, deck, &mut rng);
             let rtg = rating(&state.stats);
 
-            if rtg > known_best_rating {
-               known_best_rating = try_report_score(
-                  rtg,
-                  &actions,
-                  deck,
-                  &state.stats,
-                  known_best_rating,
-                  &BEST_RATING,
-                  &sender,
-               )
-            }
+            sender
+               .send(Result {
+                  deck: deck.to_vec(),
+                  rating: rtg,
+                  actions,
+                  stats: state.stats,
+               })
+               .unwrap();
          }
       });
    }
 
    let mut best_result = Result::default();
-   let mut dirty = false;
+
+   struct RunningMean {
+      mean: f64,
+      n: u64,
+   }
+
+   let mut tier_list: IndexMap<u32, RunningMean> = IndexMap::new();
+   let support_cards: HashMap<u32, SupportCard> = support_card_pool.iter().map(|x| (x.id, x.clone())).collect();
+
+   let mut last_time_tierlist_written = Instant::now();
 
    loop {
       let maybe_msg = receiver.recv_timeout(Duration::from_secs(30));
       match maybe_msg {
          Ok(msg) => {
-            best_result = msg;
-            println!("New best rating: {:.2}", best_result.rating);
-            dirty = true;
-         }
-         Err(RecvTimeoutError::Timeout) => {
-            if dirty {
-               for action in &best_result.actions {
-                  println!("{:?}", action);
-               }
-               for card in &best_result.deck {
-                  println!("{}", card);
-               }
-               println!("{:?}", best_result.stats);
-               println!("{}", best_result.rating);
+            for card in msg.deck.iter() {
+               let entry = tier_list.entry(card.id).or_insert(RunningMean { mean: 0.0, n: 0 });
+               entry.n += 1;
+               entry.mean += (msg.rating - entry.mean) / entry.n as f64;
             }
-            dirty = false;
-         }
-         Err(RecvTimeoutError::Disconnected) => {
-            if dirty {
-               for action in best_result.actions {
-                  println!("{:?}", action);
-               }
-               for card in best_result.deck {
-                  println!("{}", card);
-               }
-               println!("{:?}", best_result.stats);
-               println!("{}", best_result.rating);
+            if msg.rating > best_result.rating {
+               best_result = msg;
+               println!("New best rating: {:.2}", best_result.rating);
             }
-            break;
+            if last_time_tierlist_written.elapsed() >= Duration::from_secs(30) {
+               let mut f = File::create("tierlist.txt").unwrap();
+               tier_list.sort_unstable_by_key(|_, v| std::cmp::Reverse(n64(v.mean)));
+               for (k, v) in tier_list.iter() {
+                  writeln!(f, "{}: {:.2}", support_cards[k], v.mean).unwrap();
+               }
+               last_time_tierlist_written = Instant::now();
+            }
          }
+         Err(_) => break,
       }
    }
 }
