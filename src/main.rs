@@ -109,11 +109,11 @@ fn main() {
                f.write_all(HTML_HEADER.as_bytes()).unwrap();
                tier_list.sort_unstable_by_key(|_, v| std::cmp::Reverse(n64(v.mean)));
                let tiers = [
-                  ("SS", 5975),
-                  ("S", 5925),
-                  ("A", 5800),
-                  ("B", 5700),
-                  ("C", 5600),
+                  ("SS", 6150),
+                  ("S", 6050),
+                  ("A", 5950),
+                  ("B", 5850),
+                  ("C", 5750),
                   ("D", 0),
                ];
                let mut current_tier_idx = 0;
