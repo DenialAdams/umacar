@@ -166,9 +166,11 @@ pub fn take_action<R: Rng>(s: &mut State, action: Action, deck: &[SupportCard], 
       }
       Action::Train(training_stat) => {
          let failure_chance = if training_stat == Stat::Wit {
-            if s.energy < 30 { 0.8 } else { 0.0 }; // TODO
+            if s.energy < 30 { 0.8 } else { 0.0 } // TODO
+         } else if s.energy < 50 {
+            0.8
          } else {
-            if s.energy < 50 { 0.8 } else { 0.0 }; // TODO
+            0.0
          };
          if rng.random_bool(1.0 - failure_chance) {
             let stat_values_for_training: [f64; 5] = match training_stat {
