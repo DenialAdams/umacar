@@ -96,11 +96,30 @@ fn main() {
                println!("New best rating: {:.2}", best_result.rating);
             }
             if last_time_tierlist_written.elapsed() >= Duration::from_secs(30) {
-               let mut f = File::create("tierlist.txt").unwrap();
+               let mut f = File::create("tierlist.html").unwrap();
+               f.write_all(HTML_HEADER.as_bytes()).unwrap();
                tier_list.sort_unstable_by_key(|_, v| std::cmp::Reverse(n64(v.mean)));
+               let tiers = [("SS", 5975), ("S", 5925), ("A", 5800), ("B", 5700), ("C", 5600), ("D", 0)];
+               let mut current_tier_idx = 0;
+               let mut new_tier = true;
                for (k, v) in tier_list.iter() {
-                  writeln!(f, "{}: {:.2}", support_cards[k], v.mean).unwrap();
+                  while v.mean < tiers[current_tier_idx].1 as f64 {
+                     current_tier_idx += 1;
+                     new_tier = true;
+                  }
+                  if new_tier {
+                     if current_tier_idx != 0 {
+                        writeln!(f, "</div></div>").unwrap();
+                     }
+                     writeln!(f, "<div class=\"tier\" id=\"{}\">", tiers[current_tier_idx].0).unwrap();
+                     writeln!(f, "<h2>{}</h2>", tiers[current_tier_idx].0).unwrap();
+                     writeln!(f, "<div class=\"icons\">").unwrap();
+                     new_tier = false;
+                  }
+                  writeln!(f, "<img src=\"./cardImages/support_card_s_{}.png\" alt=\"{} - {:.2}\">", support_cards[k].id, support_cards[k], v.mean).unwrap();
                }
+               writeln!(f, "</div></div>").unwrap();
+               f.write_all(HTML_FOOTER.as_bytes()).unwrap();
                last_time_tierlist_written = Instant::now();
             }
          }
@@ -108,3 +127,44 @@ fn main() {
       }
    }
 }
+
+const HTML_HEADER: &str = r##"<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>tier list</title>
+  <style>
+    body {
+      background: #111;
+      color: #eee;
+      font-family: monospace;
+      margin: 2rem;
+    }
+    h1 { margin-bottom: 1rem; }
+    .tier {
+      margin-bottom: 1.5rem;
+    }
+    .tier h2 {
+      font-size: 1rem;
+      margin: 0.5rem 0;
+    }
+    .icons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+    img {
+      width: 64px;
+      height: 64px;
+      object-fit: cover;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+"##;
+
+const HTML_FOOTER: &str = r##"
+</body>
+</html>
+"##;
