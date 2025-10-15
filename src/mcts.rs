@@ -1,8 +1,9 @@
+use arrayvec::ArrayVec;
 use noisy_float::prelude::*;
 use rand::prelude::*;
 
 use crate::SupportCard;
-use crate::career::{Action, Stat, State, take_action};
+use crate::career::{Action, State, take_action};
 use crate::ratings::rating;
 
 const CAREER_LENGTH: u8 = 72;
@@ -18,19 +19,14 @@ struct MctsStats {
 pub fn intelligently_run_career<R: Rng>(state: &mut State, deck: &[SupportCard], rng: &mut R) -> Vec<Action> {
    let mut actions = Vec::new();
    while state.turn < CAREER_LENGTH {
-      let possible_actions = [
-         Action::Rest,
-         Action::Train(Stat::Speed),
-         Action::Train(Stat::Stamina),
-         Action::Train(Stat::Power),
-         Action::Train(Stat::Guts),
-         Action::Train(Stat::Wit),
-         Action::Recreation,
-      ];
-      let mut mcts_stats: [MctsStats; 7] = [MctsStats {
-         num_sims: 0,
-         total_score: 0.0,
-      }; 7];
+      let possible_actions = state.possible_actions();
+      let mut mcts_stats: ArrayVec<MctsStats, 7> = ArrayVec::new();
+      for _ in 0..possible_actions.len() {
+         mcts_stats.push(MctsStats {
+            num_sims: 0,
+            total_score: 0.0,
+         });
+      }
       let mut total_sims = 0;
       while total_sims < MCTS_SIMS {
          let action_to_try = mcts_stats
@@ -68,15 +64,6 @@ pub fn intelligently_run_career<R: Rng>(state: &mut State, deck: &[SupportCard],
 }
 
 fn random_rollout<R: Rng>(mut s: State, deck: &[SupportCard], rng: &mut R) -> f64 {
-   let possible_actions = [
-      Action::Rest,
-      Action::Train(Stat::Speed),
-      Action::Train(Stat::Stamina),
-      Action::Train(Stat::Power),
-      Action::Train(Stat::Guts),
-      Action::Train(Stat::Wit),
-      Action::Recreation,
-   ];
    let start_turn = s.turn;
    loop {
       if s.turn == CAREER_LENGTH {
@@ -88,6 +75,7 @@ fn random_rollout<R: Rng>(mut s: State, deck: &[SupportCard], rng: &mut R) -> f6
       {
          break;
       }
+      let possible_actions = s.possible_actions();
       take_action(&mut s, *possible_actions.choose(rng).unwrap(), deck, rng);
    }
    rating(&s.stats)

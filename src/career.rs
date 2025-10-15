@@ -1,3 +1,4 @@
+use arrayvec::ArrayVec;
 use num_traits::PrimInt;
 use rand::prelude::*;
 
@@ -18,6 +19,7 @@ pub enum Action {
    Rest,
    Train(Stat),
    Recreation,
+   RestAndRecreation,
 }
 
 #[derive(Clone, Copy)]
@@ -72,6 +74,44 @@ pub struct State {
    pub support_locations: [Stat; std::mem::variant_count::<Stat>()],
 }
 
+impl State {
+   fn is_summer_vacation(&self) -> bool {
+      self.turn == 36
+         || self.turn == 37
+         || self.turn == 38
+         || self.turn == 39
+         || self.turn == 60
+         || self.turn == 61
+         || self.turn == 62
+         || self.turn == 63
+   }
+
+   pub fn possible_actions(&self) -> ArrayVec<Action, 7> {
+      if self.is_summer_vacation() {
+         let mut r = ArrayVec::new();
+         r.extend([
+            Action::Train(Stat::Speed),
+            Action::Train(Stat::Stamina),
+            Action::Train(Stat::Power),
+            Action::Train(Stat::Guts),
+            Action::Train(Stat::Wit),
+            Action::RestAndRecreation,
+         ]);
+         r
+      } else {
+         ArrayVec::from([
+            Action::Rest,
+            Action::Train(Stat::Speed),
+            Action::Train(Stat::Stamina),
+            Action::Train(Stat::Power),
+            Action::Train(Stat::Guts),
+            Action::Train(Stat::Wit),
+            Action::Recreation,
+         ])
+      }
+   }
+}
+
 fn add_with_cap<T: PrimInt>(v1: T, v2: T, cap: T) -> T {
    (v1 + v2).min(cap)
 }
@@ -104,6 +144,10 @@ pub fn deal_supports<R: Rng>(s: &mut State, deck: &[SupportCard], rng: &mut R) {
 
 pub fn take_action<R: Rng>(s: &mut State, action: Action, deck: &[SupportCard], rng: &mut R) {
    match action {
+      Action::RestAndRecreation => {
+         s.energy = add_with_cap(s.energy, 40, 100);
+         s.mood = s.mood.next();
+      }
       Action::Rest => {
          // https://gamewith.net/uma-musume/69549
          // numbers are clearly not true values, but should be good enough
@@ -130,7 +174,11 @@ pub fn take_action<R: Rng>(s: &mut State, action: Action, deck: &[SupportCard], 
                Stat::Guts => [5.0, 0.0, 5.0, 10.0, 0.0],
                Stat::Wit => [2.0, 0.0, 0.0, 0.0, 9.0],
             }; // TODO - these are totally bogus
-            let training_level = (s.times_trained[training_stat as usize] / 4).min(4);
+            let training_level = if s.is_summer_vacation() {
+               4
+            } else {
+               (s.times_trained[training_stat as usize] / 4).min(4)
+            };
             let num_ppl_here = s
                .support_locations
                .iter()
@@ -185,7 +233,9 @@ pub fn take_action<R: Rng>(s: &mut State, action: Action, deck: &[SupportCard], 
                   * growth_rate;
                s.stats[stat as usize] = add_with_cap(s.stats[stat as usize], final_training_value.round() as u16, 1200);
             }
-            s.times_trained[training_stat as usize] = s.times_trained[training_stat as usize].saturating_add(1);
+            if !s.is_summer_vacation() {
+               s.times_trained[training_stat as usize] = s.times_trained[training_stat as usize].saturating_add(1);
+            }
 
             // Adjust friendship
             for card_here in s

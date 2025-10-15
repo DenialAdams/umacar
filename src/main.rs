@@ -94,12 +94,28 @@ fn main() {
             if msg.rating > best_result.rating {
                best_result = msg;
                println!("New best rating: {:.2}", best_result.rating);
+               let mut f = File::create("best.txt").unwrap();
+               for action in &best_result.actions {
+                  writeln!(f, "{:?}", action).unwrap();
+               }
+               for card in &best_result.deck {
+                  writeln!(f, "{}", card).unwrap();
+               }
+               writeln!(f, "{:?}", best_result.stats).unwrap();
+               writeln!(f, "{}", best_result.rating).unwrap();
             }
             if last_time_tierlist_written.elapsed() >= Duration::from_secs(30) {
                let mut f = File::create("tierlist.html").unwrap();
                f.write_all(HTML_HEADER.as_bytes()).unwrap();
                tier_list.sort_unstable_by_key(|_, v| std::cmp::Reverse(n64(v.mean)));
-               let tiers = [("SS", 5975), ("S", 5925), ("A", 5800), ("B", 5700), ("C", 5600), ("D", 0)];
+               let tiers = [
+                  ("SS", 5975),
+                  ("S", 5925),
+                  ("A", 5800),
+                  ("B", 5700),
+                  ("C", 5600),
+                  ("D", 0),
+               ];
                let mut current_tier_idx = 0;
                let mut new_tier = true;
                for (k, v) in tier_list.iter() {
@@ -116,7 +132,12 @@ fn main() {
                      writeln!(f, "<div class=\"icons\">").unwrap();
                      new_tier = false;
                   }
-                  writeln!(f, "<img src=\"./cardImages/support_card_s_{}.png\" alt=\"{} - {:.2}\">", support_cards[k].id, support_cards[k], v.mean).unwrap();
+                  writeln!(
+                     f,
+                     "<img src=\"./cardImages/support_card_s_{}.png\" alt=\"{} - {:.2}\">",
+                     support_cards[k].id, support_cards[k], v.mean
+                  )
+                  .unwrap();
                }
                writeln!(f, "</div></div>").unwrap();
                f.write_all(HTML_FOOTER.as_bytes()).unwrap();
