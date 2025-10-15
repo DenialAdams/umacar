@@ -165,7 +165,11 @@ pub fn take_action<R: Rng>(s: &mut State, action: Action, deck: &[SupportCard], 
          }
       }
       Action::Train(training_stat) => {
-         let failure_chance = if s.energy < 50 { 0.8 } else { 0.0 }; // TODO
+         let failure_chance = if training_stat == Stat::Wit {
+            if s.energy < 30 { 0.8 } else { 0.0 }; // TODO
+         } else {
+            if s.energy < 50 { 0.8 } else { 0.0 }; // TODO
+         };
          if rng.random_bool(1.0 - failure_chance) {
             let stat_values_for_training: [f64; 5] = match training_stat {
                Stat::Speed => [10.0, 0.0, 5.0, 0.0, 0.0],
@@ -281,6 +285,8 @@ pub fn take_action<R: Rng>(s: &mut State, action: Action, deck: &[SupportCard], 
                   s.energy = add_with_cap(s.energy, 5 + sum_wis_recovery, 100);
                }
             }
+         } else if training_stat == Stat::Wit {
+            s.energy = add_with_cap(s.energy, 5, 100);
          } else {
             // TODO
             s.mood = s.mood.prior();
