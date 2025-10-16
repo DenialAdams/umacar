@@ -165,25 +165,52 @@ pub fn take_action<R: Rng>(s: &mut State, action: Action, deck: &[SupportCard], 
          }
       }
       Action::Train(training_stat) => {
-         let failure_chance = if training_stat == Stat::Wit {
-            if s.energy < 30 { 0.8 } else { 0.0 } // TODO
-         } else if s.energy < 50 {
-            0.8
+         let training_level = if s.is_summer_vacation() {
+            4
          } else {
+            (s.times_trained[training_stat as usize] / 4).min(4)
+         } as u16;
+         let training_failure_rate = match training_stat {
+            Stat::Speed => 520 + training_level * 4,
+            Stat::Stamina => 507 + training_level * 4,
+            Stat::Power => 516 + training_level * 4,
+            Stat::Guts => 532 + training_level * 4,
+            Stat::Wit => 320 + training_level,
+         };
+         let failure_chance = if s.energy >= 100 {
             0.0
+         } else {
+            let base = (s.energy as f64 - 100.0) * (s.energy as f64 * 10.0 - training_failure_rate as f64) / 400.0;
+            base.ceil().clamp(0.0, 99.0) / 100.0
          };
          if rng.random_bool(1.0 - failure_chance) {
-            let stat_values_for_training: [f64; 5] = match training_stat {
-               Stat::Speed => [10.0, 0.0, 5.0, 0.0, 0.0],
-               Stat::Stamina => [0.0, 10.0, 0.0, 5.0, 0.0],
-               Stat::Power => [0.0, 5.0, 10.0, 0.0, 0.0],
-               Stat::Guts => [5.0, 0.0, 5.0, 10.0, 0.0],
-               Stat::Wit => [2.0, 0.0, 0.0, 0.0, 9.0],
-            }; // TODO - these are totally bogus
-            let training_level = if s.is_summer_vacation() {
-               4
-            } else {
-               (s.times_trained[training_stat as usize] / 4).min(4)
+            let stat_values_for_training: [f64; 5] = match (training_stat, training_level) {
+               (Stat::Speed, 0) => [11.0, 0.0, 6.0, 0.0, 0.0],
+               (Stat::Speed, 1) => [12.0, 0.0, 6.0, 0.0, 0.0],
+               (Stat::Speed, 2) => [13.0, 0.0, 6.0, 0.0, 0.0],
+               (Stat::Speed, 3) => [14.0, 0.0, 7.0, 0.0, 0.0],
+               (Stat::Speed, 4) => [15.0, 0.0, 8.0, 0.0, 0.0],
+               (Stat::Stamina, 0) => [0.0, 10.0, 0.0, 6.0, 0.0],
+               (Stat::Stamina, 1) => [0.0, 11.0, 0.0, 6.0, 0.0],
+               (Stat::Stamina, 2) => [0.0, 12.0, 0.0, 6.0, 0.0],
+               (Stat::Stamina, 3) => [0.0, 13.0, 0.0, 7.0, 0.0],
+               (Stat::Stamina, 4) => [0.0, 14.0, 0.0, 8.0, 0.0],
+               (Stat::Power, 0) => [0.0, 6.0, 9.0, 0.0, 0.0],
+               (Stat::Power, 1) => [0.0, 6.0, 10.0, 0.0, 0.0],
+               (Stat::Power, 2) => [0.0, 6.0, 11.0, 0.0, 0.0],
+               (Stat::Power, 3) => [0.0, 7.0, 12.0, 0.0, 0.0],
+               (Stat::Power, 4) => [0.0, 8.0, 13.0, 0.0, 0.0],
+               (Stat::Guts, 0) => [5.0, 0.0, 5.0, 8.0, 0.0],
+               (Stat::Guts, 1) => [5.0, 0.0, 5.0, 9.0, 0.0],
+               (Stat::Guts, 2) => [5.0, 0.0, 5.0, 10.0, 0.0],
+               (Stat::Guts, 3) => [5.0, 0.0, 5.0, 12.0, 0.0],
+               (Stat::Guts, 4) => [6.0, 0.0, 5.0, 13.0, 0.0],
+               (Stat::Wit, 0) => [2.0, 0.0, 0.0, 0.0, 10.0],
+               (Stat::Wit, 1) => [2.0, 0.0, 0.0, 0.0, 11.0],
+               (Stat::Wit, 2) => [2.0, 0.0, 0.0, 0.0, 12.0],
+               (Stat::Wit, 3) => [3.0, 0.0, 0.0, 0.0, 13.0],
+               (Stat::Wit, 4) => [4.0, 0.0, 0.0, 0.0, 14.0],
+               _ => unreachable!(),
             };
             let num_ppl_here = s
                .support_locations
@@ -218,12 +245,11 @@ pub fn take_action<R: Rng>(s: &mut State, action: Action, deck: &[SupportCard], 
             let effectiveness_mulitiplier = 1.0 + sum_training_effectiveness;
             let ppl_here_multiplier = 1.0 + (num_ppl_here as f64 * 0.05);
             let growth_rate = 1.0; // TODO
-            for (training_val, stat) in stat_values_for_training
+            for (base_training_value, stat) in stat_values_for_training
                .iter()
                .zip([Stat::Speed, Stat::Stamina, Stat::Power, Stat::Guts, Stat::Wit])
                .filter(|(tv, _)| **tv != 0.0)
             {
-               let base_training_value = training_val + training_level as f64; // TODO - wrong - how to find it?
                let bonus_training_value = s
                   .support_locations
                   .iter()
