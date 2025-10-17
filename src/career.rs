@@ -307,7 +307,7 @@ pub fn take_action<R: Rng>(s: &mut State, action: Action, deck: &[SupportCard], 
                      .support_locations
                      .iter()
                      .enumerate()
-                     .filter(|(_, stat)| **stat == Stat::Wit)
+                     .filter(|(i, stat)| **stat == Stat::Wit && s.friendship[*i] >= 80)
                      .map(|(i, _)| &deck[i].wisdom_recovery)
                      .sum();
                   s.energy = add_with_cap(s.energy, 5 + sum_wis_recovery, 100);
