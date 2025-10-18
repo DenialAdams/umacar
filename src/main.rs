@@ -109,11 +109,11 @@ fn main() {
                f.write_all(HTML_HEADER.as_bytes()).unwrap();
                tier_list.sort_unstable_by_key(|_, v| std::cmp::Reverse(n64(v.mean)));
                let tiers = [
-                  ("SS", 6150),
-                  ("S", 6050),
-                  ("A", 5950),
-                  ("B", 5850),
-                  ("C", 5750),
+                  ("SS", 6000),
+                  ("S", 5900),
+                  ("A", 5750),
+                  ("B", 5650),
+                  ("C", 5550),
                   ("D", 0),
                ];
                let mut current_tier_idx = 0;
@@ -134,7 +134,7 @@ fn main() {
                   }
                   writeln!(
                      f,
-                     "<img src=\"./cardImages/support_card_s_{}.png\" alt=\"{} - {:.2}\">",
+                     "<img src=\"./cardImages/support_card_s_{}.png\" alt=\"{}\" title=\"{:.2}\">",
                      support_cards[k].id, support_cards[k], v.mean
                   )
                   .unwrap();

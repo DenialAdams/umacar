@@ -71,7 +71,8 @@ pub struct State {
    pub turn: u8,
    pub times_trained: [u8; std::mem::variant_count::<Stat>()],
    pub friendship: [u8; 6],
-   pub support_locations: [Stat; std::mem::variant_count::<Stat>()],
+   pub support_locations: [Stat; 6],
+   pub has_hint: [bool; 6],
 }
 
 impl State {
@@ -126,7 +127,7 @@ const PRIO: [[Stat; 5]; 5] = [
 ];
 
 pub fn deal_supports<R: Rng>(s: &mut State, deck: &[SupportCard], rng: &mut R) {
-   for (card, location) in deck.iter().zip(s.support_locations.iter_mut()) {
+   for ((i, card), location) in deck.iter().enumerate().zip(s.support_locations.iter_mut()) {
       let stat_prio = PRIO[card.r#type as usize];
       let specialty_rate = (100.0 + card.specialty_rate as f64) * card.unique_specialty;
       let denom = 450.0 + specialty_rate;
@@ -139,6 +140,9 @@ pub fn deal_supports<R: Rng>(s: &mut State, deck: &[SupportCard], rng: &mut R) {
          let idx = ((val - specialty_rate) / step).floor() as usize;
          *location = stat_prio[1 + idx];
       }
+
+      let chance_to_proc_hint = 0.025 + 0.05 * card.hint_rate * card.hint_rate;
+      s.has_hint[i] = rng.random_bool(chance_to_proc_hint);
    }
 }
 
@@ -280,6 +284,18 @@ pub fn take_action<R: Rng>(s: &mut State, action: Action, deck: &[SupportCard], 
                s.friendship[card_here] = add_with_cap(s.friendship[card_here], 7, 100);
             }
 
+            // Additional friendship adjustment due to hints
+            if let Some(chosen_hint_giver) = s
+               .support_locations
+               .iter()
+               .enumerate()
+               .filter(|(i, where_at)| **where_at == training_stat && s.has_hint[*i])
+               .map(|(i, _)| i)
+               .choose(rng)
+            {
+               s.friendship[chosen_hint_giver] = add_with_cap(s.friendship[chosen_hint_giver], 5, 100);
+            }
+
             // Adjust energy
             let energy_adjustment_for_training_level = match training_level {
                0 => 0,
@@ -338,7 +354,8 @@ pub fn new_career_state(deck: &[SupportCard]) -> State {
       turn: 0,
       times_trained: [0; 5],
       friendship: [0; 6],
-      support_locations: [Stat::Speed, Stat::Speed, Stat::Speed, Stat::Speed, Stat::Speed],
+      support_locations: [Stat::Speed; 6],
+      has_hint: [false; 6],
    };
    for (i, card) in deck.iter().enumerate() {
       for (j, initial_boost) in card.starting_stats.iter().enumerate() {
